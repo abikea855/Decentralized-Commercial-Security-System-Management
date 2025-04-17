@@ -1,83 +1,140 @@
-# Decentralized Commercial Security System Management
+;; Facility Registration Contract
+;; Records details of protected properties
 
-This repository contains a blockchain-based platform for managing commercial security systems in a decentralized manner. The solution provides transparent, immutable records of security infrastructure, maintenance activities, and incident reporting across protected properties.
+(define-data-var last-facility-id uint u0)
 
-## Core Components
+(define-map facilities
+  { facility-id: uint }
+  {
+    name: (string-utf8 100),
+    address: (string-utf8 200),
+    contact-name: (string-utf8 100),
+    contact-phone: (string-utf8 20),
+    registration-date: uint,
+    active: bool
+  }
+)
 
-The platform is built around four essential smart contracts:
+(define-map facility-owners
+  { facility-id: uint }
+  { owner: principal }
+)
 
-1. **Facility Registration Contract**: Securely records and manages protected property details and security requirements
-2. **Equipment Inventory Contract**: Maintains a comprehensive registry of security devices including cameras, alarms, and access control systems
-3. **Maintenance Scheduling Contract**: Automates scheduling and verification of regular system testing and servicing
-4. **Incident Reporting Contract**: Provides tamper-proof documentation of security breaches, false alarms, and system failures
+;; Register a new facility
+(define-public (register-facility
+    (name (string-utf8 100))
+    (address (string-utf8 200))
+    (contact-name (string-utf8 100))
+    (contact-phone (string-utf8 20)))
+  (let
+    (
+      (new-id (+ (var-get last-facility-id) u1))
+    )
+    (var-set last-facility-id new-id)
+    (map-set facilities
+      { facility-id: new-id }
+      {
+        name: name,
+        address: address,
+        contact-name: contact-name,
+        contact-phone: contact-phone,
+        registration-date: (unwrap-panic (get-block-info? time u0)),
+        active: true
+      }
+    )
+    (map-set facility-owners
+      { facility-id: new-id }
+      { owner: tx-sender }
+    )
+    (ok new-id)
+  )
+)
 
-## Key Features
+;; Update facility information
+(define-public (update-facility
+    (facility-id uint)
+    (name (string-utf8 100))
+    (address (string-utf8 200))
+    (contact-name (string-utf8 100))
+    (contact-phone (string-utf8 20)))
+  (let
+    (
+      (facility-data (unwrap! (map-get? facilities { facility-id: facility-id }) (err u1)))
+      (owner-data (unwrap! (map-get? facility-owners { facility-id: facility-id }) (err u2)))
+    )
+    ;; Check if sender is the owner
+    (asserts! (is-eq tx-sender (get owner owner-data)) (err u3))
 
-- Immutable record of security infrastructure across multiple facilities
-- Real-time equipment status monitoring and alerting
-- Automated maintenance scheduling based on manufacturer specifications
-- Transparent service history for compliance and insurance purposes
-- Secure, timestamped incident documentation with evidence preservation
-- Role-based access control for sensitive security information
-- Integration capabilities with existing physical security systems
-- Automated compliance reporting for regulatory requirements
+    (map-set facilities
+      { facility-id: facility-id }
+      (merge facility-data
+        {
+          name: name,
+          address: address,
+          contact-name: contact-name,
+          contact-phone: contact-phone
+        }
+      )
+    )
+    (ok true)
+  )
+)
 
-## Getting Started
+;; Deactivate a facility
+(define-public (deactivate-facility (facility-id uint))
+  (let
+    (
+      (facility-data (unwrap! (map-get? facilities { facility-id: facility-id }) (err u1)))
+      (owner-data (unwrap! (map-get? facility-owners { facility-id: facility-id }) (err u2)))
+    )
+    ;; Check if sender is the owner
+    (asserts! (is-eq tx-sender (get owner owner-data)) (err u3))
 
-### Prerequisites
+    (map-set facilities
+      { facility-id: facility-id }
+      (merge facility-data { active: false })
+    )
+    (ok true)
+  )
+)
 
-- Node.js and npm
-- Truffle or Hardhat development framework
-- Web3.js or ethers.js library
-- MetaMask or similar Ethereum wallet
-- Ganache (for local development)
+;; Reactivate a facility
+(define-public (reactivate-facility (facility-id uint))
+  (let
+    (
+      (facility-data (unwrap! (map-get? facilities { facility-id: facility-id }) (err u1)))
+      (owner-data (unwrap! (map-get? facility-owners { facility-id: facility-id }) (err u2)))
+    )
+    ;; Check if sender is the owner
+    (asserts! (is-eq tx-sender (get owner owner-data)) (err u3))
 
-### Installation
+    (map-set facilities
+      { facility-id: facility-id }
+      (merge facility-data { active: true })
+    )
+    (ok true)
+  )
+)
 
-1. Clone the repository
-```
-git clone https://github.com/your-username/decentralized-security-management.git
-cd decentralized-security-management
-```
+;; Read-only function to get facility details
+(define-read-only (get-facility (facility-id uint))
+  (map-get? facilities { facility-id: facility-id })
+)
 
-2. Install dependencies
-```
-npm install
-```
+;; Read-only function to check if caller is facility owner
+(define-read-only (is-facility-owner (facility-id uint) (caller principal))
+  (let
+    (
+      (owner-data (map-get? facility-owners { facility-id: facility-id }))
+    )
+    (and
+      (is-some owner-data)
+      (is-eq caller (get owner (unwrap! owner-data false)))
+    )
+  )
+)
 
-3. Compile smart contracts
-```
-npx truffle compile
-```
-
-4. Deploy to your preferred network
-```
-npx truffle migrate --network [network-name]
-```
-
-## Usage
-
-The platform supports a comprehensive security management workflow:
-
-1. Register facilities with detailed security requirements and floor plans
-2. Add security equipment with complete specifications and locations
-3. Set up maintenance schedules with automatic notification system
-4. Document and track security incidents with supporting evidence
-5. Generate audit trails for compliance and insurance purposes
-
-## Benefits
-
-- Reduced security system downtime through proactive maintenance
-- Enhanced accountability for security service providers
-- Improved regulatory compliance with automatic documentation
-- Tamper-proof incident records for insurance claims
-- Real-time visibility into security system status across multiple locations
-- Streamlined handover between security personnel shifts
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contact
-
-For questions or support, please open an issue in this repository or contact the project maintainers.
+;; Read-only function to get total number of facilities
+(define-read-only (get-facility-count)
+  (var-get last-facility-id)
+)
