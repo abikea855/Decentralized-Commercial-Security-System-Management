@@ -5,3 +5,5 @@ R
 "contracts/equipment-inventory.clar,3/b/3b1f96dbf83c582042ddfe9d66a175daa9a2e060
 T
 $contracts/facility-registration.clar,b/6/b67dd24c0c80c57070b0d637512db6500786bb7d
+S
+#tests/facility-registration.test.ts,f/c/fc76c22ff75bb4e31860e53503f00f3a04657b38
